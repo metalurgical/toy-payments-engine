@@ -1,8 +1,8 @@
-use crate::internals::shared::deserialize_u128_fixed;
+use crate::internals::shared::{deserialize_u128_fixed, serialize_option_u128_fixed};
 use crate::internals::transaction_type::TransactionType;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TransactionRecord {
     #[serde(rename = "type")]
     pub transaction_type: TransactionType,
@@ -13,5 +13,6 @@ pub struct TransactionRecord {
     pub transaction_id: Option<u32>,
     // Convert float to integer to avoid rounding errors in floating point math, scaled accordingly
     #[serde(deserialize_with = "deserialize_u128_fixed")]
+    #[serde(serialize_with = "serialize_option_u128_fixed")]
     pub amount: Option<u128>,
 }

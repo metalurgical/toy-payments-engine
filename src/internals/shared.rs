@@ -1,4 +1,6 @@
+use crate::internals::transaction_record::TransactionRecord;
 use serde::{Deserialize, Deserializer, Serializer};
+use std::fs::File;
 
 const PRECISION_SCALE: u128 = 10_000;
 
@@ -73,8 +75,35 @@ where
     serializer.serialize_str(&format_u128_fixed(*val))
 }
 
+pub fn serialize_option_u128_fixed<S>(val: &Option<u128>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match val {
+        Some(amount) => serializer.serialize_some(&format_u128_fixed(*amount)),
+        None => serializer.serialize_none(),
+    }
+}
+
+pub fn stream_transaction_records(file: File) -> impl Iterator<Item = TransactionRecord> {
+    let reader = csv::ReaderBuilder::new()
+        .trim(csv::Trim::All)
+        .flexible(true)
+        .from_reader(file);
+
+    reader
+        .into_deserialize::<TransactionRecord>()
+        .filter_map(|result| match result {
+            Ok(record) => Some(record),
+            Err(e) => {
+                eprintln!("Skipping problematic item: {}", e);
+                None
+            }
+        })
+}
+
 #[cfg(test)]
-mod test {
+mod test_u128_serde {
     use super::*;
     use rstest::rstest;
 
@@ -137,5 +166,57 @@ mod test {
             .unwrap()
             .unwrap();
         assert_eq!(format_u128_fixed(parsed), canonical);
+    }
+}
+
+#[cfg(test)]
+mod test_parse_transaction_record {
+    use super::*;
+    use crate::internals::transaction_type::TransactionType;
+    use std::fs::File;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_parse_csv_to_transaction_record() {
+        let file = File::open(PathBuf::from("test_input/basic_test.csv")).unwrap();
+        let records: Vec<TransactionRecord> = stream_transaction_records(file).collect();
+        assert_eq!(records.len(), 9);
+
+        let deposit = records[0].clone();
+        assert_eq!(deposit.transaction_type, TransactionType::Deposit);
+        assert_eq!(deposit.client_id, 1);
+        assert_eq!(deposit.transaction_id, Some(1));
+        assert_eq!(deposit.amount, Some(10_000));
+
+        let withdrawal = records[3].clone();
+        assert_eq!(withdrawal.transaction_type, TransactionType::Withdrawal);
+        assert_eq!(withdrawal.client_id, 1);
+        assert_eq!(withdrawal.transaction_id, Some(4));
+        assert_eq!(withdrawal.amount, Some(15_000));
+
+        let dispute = records[5].clone();
+        assert_eq!(dispute.transaction_type, TransactionType::Dispute);
+        assert_eq!(dispute.client_id, 2);
+        assert_eq!(dispute.transaction_id, Some(2));
+        assert_eq!(dispute.amount, None);
+
+        let resolve = records[6].clone();
+        assert_eq!(resolve.transaction_type, TransactionType::Resolve);
+        assert_eq!(resolve.client_id, 2);
+        assert_eq!(resolve.transaction_id, Some(2));
+        assert_eq!(resolve.amount, None);
+
+        let chargeback = records[8].clone();
+        assert_eq!(chargeback.transaction_type, TransactionType::Chargeback);
+        assert_eq!(chargeback.client_id, 1);
+        assert_eq!(chargeback.transaction_id, Some(1));
+        assert_eq!(chargeback.amount, None);
+    }
+
+    #[test]
+    fn test_parse_csv_skips_bad_rows() {
+        let file = File::open(PathBuf::from("test_input/basic_test.csv")).unwrap();
+        let records: Vec<TransactionRecord> = stream_transaction_records(file).collect();
+        assert_eq!(records.len(), 9);
     }
 }
