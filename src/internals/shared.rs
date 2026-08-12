@@ -186,30 +186,30 @@ mod test_parse_transaction_record {
         assert_eq!(deposit.transaction_type, TransactionType::Deposit);
         assert_eq!(deposit.client_id, 1);
         assert_eq!(deposit.transaction_id, Some(1));
-        assert_eq!(deposit.amount, Some(10_000));
+        assert_eq!(deposit.amount, Some(50_000));
 
-        let withdrawal = records[3].clone();
+        let withdrawal = records[2].clone();
         assert_eq!(withdrawal.transaction_type, TransactionType::Withdrawal);
         assert_eq!(withdrawal.client_id, 1);
-        assert_eq!(withdrawal.transaction_id, Some(4));
-        assert_eq!(withdrawal.amount, Some(15_000));
+        assert_eq!(withdrawal.transaction_id, Some(3));
+        assert_eq!(withdrawal.amount, Some(20_000));
 
-        let dispute = records[5].clone();
+        let dispute = records[6].clone();
         assert_eq!(dispute.transaction_type, TransactionType::Dispute);
         assert_eq!(dispute.client_id, 2);
-        assert_eq!(dispute.transaction_id, Some(2));
+        assert_eq!(dispute.transaction_id, Some(4));
         assert_eq!(dispute.amount, None);
 
-        let resolve = records[6].clone();
+        let resolve = records[7].clone();
         assert_eq!(resolve.transaction_type, TransactionType::Resolve);
         assert_eq!(resolve.client_id, 2);
-        assert_eq!(resolve.transaction_id, Some(2));
+        assert_eq!(resolve.transaction_id, Some(4));
         assert_eq!(resolve.amount, None);
 
-        let chargeback = records[8].clone();
+        let chargeback = records[4].clone();
         assert_eq!(chargeback.transaction_type, TransactionType::Chargeback);
         assert_eq!(chargeback.client_id, 1);
-        assert_eq!(chargeback.transaction_id, Some(3));
+        assert_eq!(chargeback.transaction_id, Some(1));
         assert_eq!(chargeback.amount, None);
     }
 

@@ -119,7 +119,7 @@ impl ClientAccount {
             None => Err("No deposit record found to dispute".to_string()),
             Some(original_deposit) => {
                 let amount = original_deposit.amount;
-                self.available = self.available.saturating_sub(amount);
+                self.available -= amount;
                 self.held += amount;
                 self.disputed.insert(tx.transaction_id, tx.clone());
                 Ok(())
@@ -203,6 +203,7 @@ impl Serialize for ClientAccount {
     {
         #[derive(Serialize)]
         struct Layout {
+            #[serde(rename = "client")]
             client_id: u16,
             #[serde(serialize_with = "serialize_u128_fixed")]
             available: u128,
@@ -214,11 +215,11 @@ impl Serialize for ClientAccount {
         }
 
         let shadow = Layout {
-            client_id: self.client_id,
-            available: self.available,
-            held: self.held,
+            client_id: self.client_id(),
+            available: self.available(),
+            held: self.held(),
             total: self.total(),
-            locked: self.locked,
+            locked: self.locked(),
         };
 
         shadow.serialize(serializer)
