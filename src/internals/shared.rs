@@ -96,7 +96,7 @@ pub fn stream_transaction_records(file: File) -> impl Iterator<Item = Transactio
         .filter_map(|result| match result {
             Ok(record) => Some(record),
             Err(e) => {
-                eprintln!("Skipping problematic item: {}", e);
+                // eprintln!("Skipping problematic item: {}", e);
                 None
             }
         })
