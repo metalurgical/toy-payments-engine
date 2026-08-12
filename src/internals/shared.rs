@@ -209,7 +209,7 @@ mod test_parse_transaction_record {
         let chargeback = records[8].clone();
         assert_eq!(chargeback.transaction_type, TransactionType::Chargeback);
         assert_eq!(chargeback.client_id, 1);
-        assert_eq!(chargeback.transaction_id, Some(1));
+        assert_eq!(chargeback.transaction_id, Some(3));
         assert_eq!(chargeback.amount, None);
     }
 

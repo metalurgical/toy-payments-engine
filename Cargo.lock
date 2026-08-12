@@ -665,6 +665,7 @@ dependencies = [
  "clap",
  "csv",
  "futures-util",
+ "indexmap",
  "postcard",
  "rstest",
  "serde",

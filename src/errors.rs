@@ -10,4 +10,6 @@ pub enum ApplicationError {
     CSVParse(#[from] csv::Error),
     #[error("Ledger processing failed: {0}")]
     LedgerError(String),
+    #[error("Conversion failed: {0}")]
+    StructConversionError(String),
 }
