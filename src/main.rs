@@ -32,35 +32,53 @@ fn main() -> anyhow::Result<(), errors::ApplicationError> {
             .or_insert_with(|| ClientAccount::new(client_id));
     }
 
-    for (client_id, client) in accounts_collection.iter_mut() {
-        for transaction in ledger.retrieve_all_transactions(*client_id).flatten() {
+    for (_, client) in accounts_collection.iter_mut() {
+        for transaction in ledger
+            .retrieve_all_transactions(client.client_id())
+            .flatten()
+        {
             let tx = transaction.clone();
             match tx.transaction_type {
-                TransactionType::Deposit => {
-                    if let Err(e) = client.deposit(Transaction::new(tx)?) {
-                        eprintln!("Skipping problematic transaction: {}", e);
+                TransactionType::Deposit => match Transaction::new(tx) {
+                    Ok(tx) => {
+                        if let Err(e) = client.deposit(tx) {
+                            eprintln!("Skipping problematic transaction: {}", e);
+                        }
                     }
-                }
-                TransactionType::Withdrawal => {
-                    if let Err(e) = client.withdraw(Transaction::new(tx)?) {
-                        eprintln!("Skipping problematic transaction: {}", e);
+                    Err(e) => eprintln!("Skipping problematic transaction: {}", e),
+                },
+                TransactionType::Withdrawal => match Transaction::new(tx) {
+                    Ok(tx) => {
+                        if let Err(e) = client.withdraw(tx) {
+                            eprintln!("Skipping problematic transaction: {}", e);
+                        }
                     }
-                }
-                TransactionType::Dispute => {
-                    if let Err(e) = client.dispute(Operation::new(tx)?) {
-                        eprintln!("Skipping problematic transaction: {}", e);
+                    Err(e) => eprintln!("Skipping problematic transaction: {}", e),
+                },
+                TransactionType::Dispute => match Operation::new(tx) {
+                    Ok(op) => {
+                        if let Err(e) = client.dispute(op) {
+                            eprintln!("Skipping problematic transaction: {}", e);
+                        }
                     }
-                }
-                TransactionType::Resolve => {
-                    if let Err(e) = client.resolve(Operation::new(tx)?) {
-                        eprintln!("Skipping problematic transaction: {}", e);
+                    Err(e) => eprintln!("Skipping problematic transaction: {}", e),
+                },
+                TransactionType::Resolve => match Operation::new(tx) {
+                    Ok(op) => {
+                        if let Err(e) = client.resolve(op) {
+                            eprintln!("Skipping problematic transaction: {}", e);
+                        }
                     }
-                }
-                TransactionType::Chargeback => {
-                    if let Err(e) = client.chargeback(Operation::new(tx)?) {
-                        eprintln!("Skipping problematic transaction: {}", e);
+                    Err(e) => eprintln!("Skipping problematic transaction: {}", e),
+                },
+                TransactionType::Chargeback => match Operation::new(tx) {
+                    Ok(op) => {
+                        if let Err(e) = client.chargeback(op) {
+                            eprintln!("Skipping problematic transaction: {}", e);
+                        }
                     }
-                }
+                    Err(e) => eprintln!("Skipping problematic transaction: {}", e),
+                },
             }
         }
     }
