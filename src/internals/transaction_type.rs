@@ -1,0 +1,16 @@
+use serde::Deserialize;
+
+#[derive(Debug, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TransactionType {
+    // Increases available funds.
+    Deposit,
+    // Decreases available funds. Errors on insufficient available funds.
+    Withdrawal,
+    // Increases held funds, decreases available funds by the same amount. Errors on transaction reference not existing.
+    Dispute,
+    // Decreases held funds, increase available funds by same amount. Errors on transaction reference not existing.
+    Resolve,
+    // Decreases available funds. Locks account.
+    Chargeback,
+}
