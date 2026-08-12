@@ -10,3 +10,4 @@ thiserror = "2.0.20"
 anyhow = "1.0.104"
 serde = { version = "1.0.229", features = ["derive"] }
 futures-util = "0.3.34"
+csv = "1.4.0"
