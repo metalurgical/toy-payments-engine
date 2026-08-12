@@ -6,4 +6,6 @@ pub enum ApplicationError {
     CliParse(#[from] clap::Error),
     #[error("File processing failed: {0}")]
     IoFailure(#[from] std::io::Error),
+    #[error("Parse csv error: {0}")]
+    CSVParse(#[from] csv::Error),
 }

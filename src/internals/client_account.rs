@@ -1,5 +1,6 @@
 use crate::internals::shared::serialize_u128_fixed;
 use serde::{Serialize, Serializer};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone, Default)]
 pub struct ClientAccount {
@@ -7,6 +8,7 @@ pub struct ClientAccount {
     available: u128,
     held: u128,
     locked: bool,
+    disputed: HashSet<u32>,
 }
 
 impl ClientAccount {
@@ -16,6 +18,7 @@ impl ClientAccount {
             available,
             held,
             locked,
+            disputed: HashSet::new(),
         }
     }
 
@@ -44,19 +47,29 @@ impl ClientAccount {
         if self.available < amount {
             return Err("Insufficient funds".to_string());
         }
+        if self.locked {
+            return Err("Account locked".to_string());
+        }
+        self.available -= amount;
         Ok(())
     }
 
-    pub fn dispute(&mut self, amount: u128) -> Result<(), String> {
+    pub fn dispute(&mut self, id: u32, amount: u128) -> Result<(), String> {
         if self.available < amount {
             return Err("Funds unavailable for dispute".to_string());
         }
+        self.disputed.insert(id);
         self.available -= amount;
         self.held += amount;
         Ok(())
     }
 
-    pub fn resolve(&mut self, amount: u128) -> Result<(), String> {
+    pub fn resolve(&mut self, id: u32, amount: u128) -> Result<(), String> {
+        if !self.disputed.contains(&id) {
+            return Err("No dispute logged".to_string());
+        } else {
+            self.disputed.remove(&id);
+        }
         if self.held < amount {
             return Err("Funds unavailable for resolve".to_string());
         }
@@ -65,7 +78,15 @@ impl ClientAccount {
         Ok(())
     }
 
-    pub fn chargeback(&mut self, amount: u128) -> Result<(), String> {
+    pub fn chargeback(&mut self, id: u32, amount: u128) -> Result<(), String> {
+        if self.disputed.contains(&id) {
+            return Err("No dispute logged".to_string());
+        } else {
+            self.disputed.remove(&id);
+        }
+        if self.locked {
+            return Err("Account locked".to_string());
+        }
         if self.held < amount {
             return Err("Funds unavailable for chargeback".to_string());
         }
