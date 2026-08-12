@@ -8,4 +8,6 @@ pub enum ApplicationError {
     IoFailure(#[from] std::io::Error),
     #[error("Parse csv error: {0}")]
     CSVParse(#[from] csv::Error),
+    #[error("Ledger processing failed: {0}")]
+    LedgerError(String),
 }

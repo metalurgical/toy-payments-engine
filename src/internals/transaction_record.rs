@@ -2,7 +2,7 @@ use crate::internals::shared::{deserialize_u128_fixed, serialize_option_u128_fix
 use crate::internals::transaction_type::TransactionType;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 pub struct TransactionRecord {
     #[serde(rename = "type")]
     pub transaction_type: TransactionType,

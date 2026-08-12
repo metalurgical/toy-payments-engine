@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TransactionType {
     // Increases available funds.
+    #[default]
     Deposit,
     // Decreases available funds. Errors on insufficient available funds.
     Withdrawal,

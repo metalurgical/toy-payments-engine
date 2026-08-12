@@ -1,6 +1,7 @@
 use crate::internals::shared::serialize_u128_fixed;
+use crate::internals::transaction_record::TransactionRecord;
 use serde::{Serialize, Serializer};
-use std::collections::HashSet;
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default)]
 pub struct ClientAccount {
@@ -8,17 +9,21 @@ pub struct ClientAccount {
     available: u128,
     held: u128,
     locked: bool,
-    disputed: HashSet<u32>,
+    disputed: HashMap<u16, TransactionRecord>,
+    resolved: HashMap<u16, TransactionRecord>,
+    chargeback: HashMap<u16, TransactionRecord>,
 }
 
 impl ClientAccount {
-    pub fn new(client_id: u16, available: u128, held: u128, locked: bool) -> Self {
+    pub fn new(client_id: u16) -> Self {
         Self {
             client_id,
-            available,
-            held,
-            locked,
-            disputed: HashSet::new(),
+            available: 0,
+            held: 0,
+            locked: false,
+            disputed: Default::default(),
+            resolved: Default::default(),
+            chargeback: Default::default(),
         }
     }
 
@@ -54,35 +59,53 @@ impl ClientAccount {
         Ok(())
     }
 
-    pub fn dispute(&mut self, id: u32, amount: u128) -> Result<(), String> {
+    pub fn dispute(&mut self, tx: TransactionRecord) -> Result<(), String> {
+        if self.disputed.get(&tx.client_id).is_some() {
+            return Err("Already disputed".to_string());
+        }
+        let amount = match tx.amount {
+            Some(amt) => amt,
+            None => return Err("Amount is None".to_string()),
+        };
         if self.available < amount {
             return Err("Funds unavailable for dispute".to_string());
         }
-        self.disputed.insert(id);
+        self.disputed.insert(tx.client_id, tx);
         self.available -= amount;
         self.held += amount;
         Ok(())
     }
 
-    pub fn resolve(&mut self, id: u32, amount: u128) -> Result<(), String> {
-        if !self.disputed.contains(&id) {
+    pub fn resolve(&mut self, tx: TransactionRecord) -> Result<(), String> {
+        if self.disputed.get(&tx.client_id).is_none() {
             return Err("No dispute logged".to_string());
-        } else {
-            self.disputed.remove(&id);
+        }
+        let amount = match tx.amount {
+            Some(amt) => amt,
+            None => return Err("Amount is None".to_string()),
+        };
+        if self.resolved.get(&tx.client_id).is_some() {
+            return Err("Already resolved".to_string());
         }
         if self.held < amount {
             return Err("Funds unavailable for resolve".to_string());
         }
+        self.resolved.insert(tx.client_id, tx);
         self.held -= amount;
         self.available += amount;
         Ok(())
     }
 
-    pub fn chargeback(&mut self, id: u32, amount: u128) -> Result<(), String> {
-        if self.disputed.contains(&id) {
+    pub fn chargeback(&mut self, tx: TransactionRecord) -> Result<(), String> {
+        if self.disputed.get(&tx.client_id).is_none() {
             return Err("No dispute logged".to_string());
-        } else {
-            self.disputed.remove(&id);
+        }
+        let amount = match tx.amount {
+            Some(amt) => amt,
+            None => return Err("Amount is None".to_string()),
+        };
+        if self.resolved.get(&tx.client_id).is_some() {
+            return Err("Already chargedback".to_string());
         }
         if self.locked {
             return Err("Account locked".to_string());

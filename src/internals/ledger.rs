@@ -1,3 +1,4 @@
+use crate::errors::ApplicationError;
 use crate::internals::transaction_record::TransactionRecord;
 use sled::{Config, Db};
 
@@ -6,16 +7,21 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new() -> Result<Self, ApplicationError> {
         let db = Config::new()
             .temporary(true)
             .cache_capacity(64 * 1024 * 1024)
-            .open()?;
+            .open()
+            .map_err(|e| ApplicationError::LedgerError(e.to_string()))?;
         Ok(Self { db })
     }
 
-    pub fn append_transaction(&self, record: &TransactionRecord) -> anyhow::Result<()> {
-        let generated_sequence_id = self.db.generate_id()?;
+    pub fn append_transaction(&self, record: &TransactionRecord) -> Result<(), ApplicationError> {
+        let generated_sequence_id = self
+            .db
+            .generate_id()
+            .map_err(|e| ApplicationError::LedgerError(e.to_string()))
+            .map_err(|e| ApplicationError::LedgerError(e.to_string()))?;
         let prefix_len = 1;
         let client_bytes = record.client_id.to_be_bytes();
         let generate_sequence_byte = generated_sequence_id.to_be_bytes();
@@ -25,20 +31,28 @@ impl Ledger {
         key.extend_from_slice(&client_bytes);
         key.extend_from_slice(&generate_sequence_byte);
 
-        let value = postcard::to_allocvec(record)?;
-        self.db.insert(key, value)?;
+        let value = postcard::to_allocvec(record)
+            .map_err(|e| ApplicationError::LedgerError(e.to_string()))?;
+        self.db
+            .insert(key, value)
+            .map_err(|e| ApplicationError::LedgerError(e.to_string()))?;
         Ok(())
     }
 
     pub fn retrieve_all_transactions(
         &self,
         client_id: u16,
-    ) -> impl Iterator<Item = TransactionRecord> {
+    ) -> impl Iterator<Item = Result<TransactionRecord, ApplicationError>> {
         let mut prefix = Vec::with_capacity(3);
         prefix.push(b't');
         prefix.extend_from_slice(&client_id.to_be_bytes());
+
         self.db.scan_prefix(prefix).filter_map(|row| match row {
-            Ok((_key, value)) => Some(postcard::from_bytes(&value).unwrap()),
+            Ok((_key, value)) => {
+                let result = postcard::from_bytes(&value)
+                    .map_err(|e| ApplicationError::LedgerError(e.to_string()));
+                Some(result)
+            }
             Err(_) => None,
         })
     }
@@ -112,15 +126,18 @@ mod ledger_tests {
     #[test]
     fn test_append_and_then_retrieve_transactions_by_client_id() {
         let ledger = default_ledger();
-        let history: Vec<TransactionRecord> = ledger.retrieve_all_transactions(1).collect();
+        let history: Vec<TransactionRecord> =
+            ledger.retrieve_all_transactions(1).flatten().collect();
 
         assert_eq!(history.len(), 2);
-        assert_eq!(history[0].transaction_id, Some(1));
-        assert_eq!(history[1].transaction_id, Some(2));
-        assert_eq!(history[0].transaction_type, TransactionType::Deposit);
-        assert_eq!(history[1].transaction_type, TransactionType::Withdrawal);
-        assert_eq!(history[0].amount, Some(20000));
-        assert_eq!(history[1].amount, Some(10000));
+        let history_0 = history[0].clone();
+        let history_1 = history[1].clone();
+        assert_eq!(history_0.transaction_id, Some(1));
+        assert_eq!(history_1.transaction_id, Some(2));
+        assert_eq!(history_0.transaction_type, TransactionType::Deposit);
+        assert_eq!(history_1.transaction_type, TransactionType::Withdrawal);
+        assert_eq!(history_0.amount, Some(20000));
+        assert_eq!(history_1.amount, Some(10000));
     }
 
     #[test]
@@ -155,13 +172,17 @@ mod ledger_tests {
         ledger.append_transaction(&tx_a).unwrap();
         ledger.append_transaction(&tx_b).unwrap();
 
-        let history_a: Vec<TransactionRecord> =
-            ledger.retrieve_all_transactions(client_a).collect();
+        let history_a: Vec<TransactionRecord> = ledger
+            .retrieve_all_transactions(client_a)
+            .flatten()
+            .collect();
         assert_eq!(history_a.len(), 1);
         assert_eq!(history_a[0].transaction_id, Some(1));
 
-        let history_b: Vec<TransactionRecord> =
-            ledger.retrieve_all_transactions(client_b).collect();
+        let history_b: Vec<TransactionRecord> = ledger
+            .retrieve_all_transactions(client_b)
+            .flatten()
+            .collect();
         assert_eq!(history_b.len(), 1);
         assert_eq!(history_b[0].transaction_id, Some(2));
     }
