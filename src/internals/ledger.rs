@@ -177,14 +177,8 @@ mod tests {
     #[test]
     fn mark_state_works() {
         let ledger = Ledger::new().unwrap();
-        assert_eq!(
-            ledger.is_state(TransactionType::Dispute, 1, 1).unwrap(),
-            false
-        );
+        assert!(!ledger.is_state(TransactionType::Dispute, 1, 1).unwrap());
         ledger.mark_state(TransactionType::Dispute, 1, 1).unwrap();
-        assert_eq!(
-            ledger.is_state(TransactionType::Dispute, 1, 1).unwrap(),
-            true
-        );
+        assert!(ledger.is_state(TransactionType::Dispute, 1, 1).unwrap(),);
     }
 }
