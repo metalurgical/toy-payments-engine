@@ -1,11 +1,10 @@
 use crate::errors::ApplicationError;
 use crate::internals::{
-    ledger::Ledger, operation::Operation, shared::serialize_u128_fixed, transaction::Transaction,
+    Operation, Transaction, ledger::Ledger, shared::serialize_u128_fixed,
     transaction_type::TransactionType,
 };
 use serde::{Serialize, Serializer};
 // Prevent overlap with sled TransactionError
-use crate::internals;
 use ApplicationError::TransactionError as TxError;
 
 #[derive(Clone)]
@@ -18,7 +17,7 @@ pub struct ClientAccount {
 }
 
 impl ClientAccount {
-    /// Creates a new zero-balance, unlocked account using `client_id`
+    /// Creates a new zero-balance, unlocked [`ClientAccount`] using `client_id`
     pub fn new(client_id: u16, ledger: Ledger) -> Self {
         Self {
             client_id,
@@ -34,7 +33,7 @@ impl ClientAccount {
         self.client_id
     }
 
-    /// Returns available funds, this is funds that have no disputed
+    /// Returns available funds, this is funds that have no disputes
     pub fn available(&self) -> u128 {
         self.available
     }
@@ -126,7 +125,7 @@ impl ClientAccount {
     /// - Tx has already been disputed before (can only be disputed once)
     /// - Tx has already been resolved/chargeback before
     /// - Account does not have enough available funds to be held for dispute
-    /// - Deposit cannot be retrieved from storage for [`internals::transaction_record::TransactionRecord`] referenced by operation
+    /// - Deposit cannot be retrieved from storage for [`crate::internals::transaction_record::TransactionRecord`] referenced by operation
     pub fn dispute(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Dispute {
             return Err(TxError("Not a dispute".to_string()));
@@ -185,7 +184,7 @@ impl ClientAccount {
     /// - Tx has already been resolved/chargeback before
     /// - Tx is not disputed previously
     /// - Account does not have enough held funds to be returned
-    /// - Original deposit cannot be retrieved from storage for [`internals::transaction_record::TransactionRecord`] referenced by operation
+    /// - Original deposit cannot be retrieved from storage for [`crate::internals::transaction_record::TransactionRecord`] referenced by operation
     pub fn resolve(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Resolve {
             return Err(TxError("Not a resolution".to_string()));
@@ -246,7 +245,7 @@ impl ClientAccount {
     /// - Tx has already been resolved/chargeback before
     /// - Tx is not disputed previously
     /// - Account does not have enough held funds to be returned
-    /// - Original deposit cannot be retrieved from storage for [`internals::transaction_record::TransactionRecord`] referenced by operation
+    /// - Original deposit cannot be retrieved from storage for [`crate::internals::transaction_record::TransactionRecord`] referenced by operation
     pub fn chargeback(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Chargeback {
             return Err(TxError("Not a chargeback".to_string()));
@@ -286,13 +285,13 @@ impl ClientAccount {
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
-                self.ledger
-                    .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
                 if self.held < amount {
                     return Err(TxError(
                         "Funds unavailable in hold block for chargeback".to_string(),
                     ));
                 }
+                self.ledger
+                    .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
                 self.held -= amount;
                 self.lock();
                 // TODO: This probably should be stored as a transactionrecord in ledger as well.

@@ -12,7 +12,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    /// Creates a new transaction from a TransactionRecord
+    /// Creates a new [`Transaction`] from a [`TransactionRecord`]
     pub fn new(tx: TransactionRecord) -> Result<Self, ApplicationError> {
         if let Some(id) = tx.transaction_id {
             if let Some(amount) = tx.amount {

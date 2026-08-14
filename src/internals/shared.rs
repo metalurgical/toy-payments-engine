@@ -7,6 +7,8 @@ const PRECISION_SCALE: u128 = 10_000;
 /// Parses an `Option<String>` into an `Option<u128>` for up to four points of precision after the
 /// decimal place, extra precision results in truncation. Only allows positive integers.
 fn parse_u128_fixed(input: Option<String>) -> Result<Option<u128>, String> {
+    // TODO: Refactor this to return typed error instead of String
+
     let deserialized = match input {
         Some(val) => val,
         None => return Ok(None),
@@ -93,13 +95,12 @@ where
     }
 }
 
-/// Streams `file` as [`TransactionRecord`]s. Rows that fail parsing are logged and excluded.
+/// Streams CSV [`File`] as [`TransactionRecord`]s. Rows that fail parsing are logged and excluded.
 pub fn stream_transaction_records(file: File) -> impl Iterator<Item = TransactionRecord> {
     let reader = csv::ReaderBuilder::new()
         .trim(csv::Trim::All)
         .flexible(true)
         .from_reader(file);
-
     reader
         .into_deserialize::<TransactionRecord>()
         .filter_map(|result| match result {

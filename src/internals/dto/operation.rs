@@ -11,7 +11,7 @@ pub struct Operation {
 }
 
 impl Operation {
-    /// Created a new operation from a TransactionRecord
+    /// Created a new [`Operation`] from a [`TransactionRecord`]
     pub fn new(tx: TransactionRecord) -> Result<Self, ApplicationError> {
         if let Some(id) = tx.transaction_id {
             Ok(Self {

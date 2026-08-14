@@ -14,7 +14,7 @@ pub struct Ledger {
 }
 
 impl Ledger {
-    /// Opens a fresh temporary sled database, not shared between instances
+    /// Opens a fresh temporary sled [`Db`], not shared between instances
     pub fn new() -> Result<Self, ApplicationError> {
         let db = Config::new()
             .temporary(true)
@@ -44,7 +44,7 @@ impl Ledger {
         key
     }
 
-    /// Returns the relevant operation tree
+    /// Returns the relevant operation [`Tree`]
     fn get_tree(&self, tx_type: TransactionType) -> &Tree {
         match tx_type {
             TransactionType::Withdrawal => &self.withdrawn,
@@ -56,6 +56,7 @@ impl Ledger {
     }
 
     /// Checks if the relevant operation was already processed in the relevant tree
+    /// TODO: Probably better to refactor arguments to Operation
     pub fn is_state(
         &self,
         tx_type: TransactionType,
@@ -69,6 +70,7 @@ impl Ledger {
     }
 
     /// Marks operation as processed in the relevant tree
+    /// TODO: Probably better to refactor arguments to Operation
     pub fn mark_state(
         &self,
         tx_type: TransactionType,
@@ -83,7 +85,7 @@ impl Ledger {
         Ok(())
     }
 
-    /// Appends a TransactionRecord to the database
+    /// Appends a [`TransactionRecord`] to the database
     pub fn append_transaction(&self, record: &TransactionRecord) -> Result<(), ApplicationError> {
         let prefix_len = 1;
         let client_bytes = record.client_id.to_be_bytes();
@@ -105,7 +107,7 @@ impl Ledger {
         Ok(())
     }
 
-    /// Returns a TransactionRecord from the database
+    /// Returns a [`TransactionRecord`] from the database
     pub fn get_transaction(
         &self,
         client_id: u16,

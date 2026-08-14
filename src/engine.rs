@@ -10,9 +10,9 @@ use tokio::{sync::mpsc, task::JoinSet};
 /// Bounded capacity of each client channel
 const PER_CLIENT_CHANNEL_CAPACITY: usize = 64;
 
-/// Applies ['TransactionRecord'] to ['ClientAccount'], converting the ['TransactionRecord]' to the respective
-/// ['Transaction'] or ['Operation'] DTO and then calling the respective ['ClientAccount'] method determined
-/// by ['TransactionType']
+/// Applies [`TransactionRecord`] to [`ClientAccount`], converting the [`TransactionRecord`] to the respective
+/// [`Transaction`] or [`Operation`] DTO and then calling the respective [`ClientAccount`] method determined
+/// by [`TransactionType`]
 fn apply_record(client: &mut ClientAccount, tx: TransactionRecord) {
     let result = match tx.transaction_type {
         TransactionType::Deposit => Transaction::new(tx).and_then(|t| client.deposit(t)),
@@ -38,6 +38,8 @@ pub async fn run_engine(
     let mut senders: HashMap<u16, mpsc::Sender<TransactionRecord>> = HashMap::new();
     for record in stream_transaction_records(file) {
         // Add record to DB if Deposit or Withdrawal
+        // TODO: This logic should probably move to ClientAccount, e.g using client.append_transaction(..) to interface with ledger
+        // TODO: matches!() can also be used here instead, if on latest nightly.
         match record.transaction_type {
             TransactionType::Deposit | TransactionType::Withdrawal => {
                 if let Err(e) = ledger.append_transaction(&record) {

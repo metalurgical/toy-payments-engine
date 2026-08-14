@@ -15,6 +15,7 @@ pub struct TransactionRecord {
     pub transaction_id: Option<u32>,
     // Convert float to integer to avoid rounding errors in floating point math, scaled accordingly
     #[serde(deserialize_with = "deserialize_u128_fixed")]
+    // Return to original representation
     #[serde(serialize_with = "serialize_option_u128_fixed")]
     pub amount: Option<u128>,
 }

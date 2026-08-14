@@ -9,7 +9,7 @@ use log4rs::{
 
 /// Initialized logging to write to `errors.log`
 pub fn init_logging() -> Result<(), ApplicationError> {
-    let file_appender = FileAppender::builder().build("errors.log").unwrap();
+    let file_appender = FileAppender::builder().build("errors.log")?;
     let config = Config::builder()
         .appender(Appender::builder().build("file_logger", Box::new(file_appender)))
         // Log trace and above for this application
