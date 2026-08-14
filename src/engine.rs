@@ -27,8 +27,8 @@ fn apply_record(client: &mut ClientAccount, tx: TransactionRecord) {
     }
 }
 
-/// Processes the CSV file, adding valid entries to ['Ledger'] as well as creating and
-/// applying operations to ['ClientAccount']. Returns Vec<ClientAccount> for all successfully
+/// Processes the CSV file, adding valid entries to [`Ledger`] as well as creating and
+/// applying operations to [`ClientAccount`]. Returns `Vec<ClientAccount>` for all successfully
 /// processed accounts.
 pub async fn run_engine(
     file: File,

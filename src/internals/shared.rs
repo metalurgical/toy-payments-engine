@@ -4,7 +4,7 @@ use std::fs::File;
 
 const PRECISION_SCALE: u128 = 10_000;
 
-/// Parses an Option<String> into an Option<u128> for up to four points of precision after the
+/// Parses an `Option<String>` into an `Option<u128>` for up to four points of precision after the
 /// decimal place, extra precision results in truncation. Only allows positive integers.
 fn parse_u128_fixed(input: Option<String>) -> Result<Option<u128>, String> {
     let deserialized = match input {
