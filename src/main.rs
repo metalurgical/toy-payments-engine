@@ -5,7 +5,7 @@ mod internals;
 mod logging;
 
 use crate::{
-    engine::run_engine, errors::ApplicationError, internals::ledger::Ledger, logging::init_logging,
+    engine::run_engine, errors::ApplicationError, internals::Ledger, logging::init_logging,
 };
 use clap::Parser;
 use cli::Cli;

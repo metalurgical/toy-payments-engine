@@ -1,4 +1,4 @@
-use crate::internals::transaction_record::TransactionRecord;
+use crate::internals::TransactionRecord;
 use serde::{Deserialize, Deserializer, Serializer};
 use std::fs::File;
 
@@ -61,7 +61,7 @@ where
     parse_u128_fixed(deserialized).map_err(serde::de::Error::custom)
 }
 
-/// Formats a scaled i128 back into a float with four places of precision for display.
+/// Formats a scaled i128 back into a float for display, truncating trailing zeros.
 fn format_u128_fixed(val: u128) -> String {
     let integer_part = val / PRECISION_SCALE;
     let fractional_part = val % PRECISION_SCALE;
@@ -93,6 +93,7 @@ where
     }
 }
 
+/// Streams `file` as [`TransactionRecord`]s. Rows that fail parsing are logged and excluded.
 pub fn stream_transaction_records(file: File) -> impl Iterator<Item = TransactionRecord> {
     let reader = csv::ReaderBuilder::new()
         .trim(csv::Trim::All)
@@ -112,7 +113,7 @@ pub fn stream_transaction_records(file: File) -> impl Iterator<Item = Transactio
 
 #[cfg(test)]
 mod test_u128_serde {
-    use super::*;
+    use crate::internals::shared::{format_u128_fixed, parse_u128_fixed};
     use rstest::rstest;
 
     #[rstest]
@@ -169,8 +170,8 @@ mod test_u128_serde {
 
 #[cfg(test)]
 mod test_parse_transaction_record {
-    use super::*;
-    use crate::internals::transaction_type::TransactionType;
+    use crate::internals::shared::stream_transaction_records;
+    use crate::internals::{TransactionRecord, TransactionType};
     use std::fs::File;
     use std::path::PathBuf;
 
