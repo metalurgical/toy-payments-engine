@@ -160,6 +160,11 @@ impl ClientAccount {
         match state {
             None => Err(TxError("Failed to retrieve transaction amount".to_string())),
             Some(tr) => {
+                if tr.transaction_type != TransactionType::Deposit {
+                    return Err(TxError(
+                        "Only deposits are currently disputable".to_string(),
+                    ));
+                }
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
@@ -221,6 +226,7 @@ impl ClientAccount {
         match state {
             None => Err(TxError("Failed to retrieve transaction amount".to_string())),
             Some(tr) => {
+                // TODO: Depost type check, already done for original dispute though
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
@@ -282,6 +288,7 @@ impl ClientAccount {
         match state {
             None => Err(TxError("Failed to retrieve transaction amount".to_string())),
             Some(tr) => {
+                // TODO: Deposit type check, already done for original dispute though
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
@@ -294,7 +301,7 @@ impl ClientAccount {
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
                 self.held -= amount;
                 self.lock();
-                // TODO: This probably should be stored as a transactionrecord in ledger as well.
+                // TODO: This probably should be stored as a TransactionRecord in Ledger as well, especially to produce an audit trail later
                 Ok(())
             }
         }
