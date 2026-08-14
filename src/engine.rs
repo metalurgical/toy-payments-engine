@@ -37,18 +37,6 @@ pub async fn run_engine(
     let mut client_tasks: JoinSet<ClientAccount> = JoinSet::new();
     let mut senders: HashMap<u16, mpsc::Sender<TransactionRecord>> = HashMap::new();
     for record in stream_transaction_records(file) {
-        // Add record to DB if Deposit or Withdrawal
-        // TODO: This logic should probably move to ClientAccount, e.g using client.append_transaction(..) to interface with ledger
-        // TODO: matches!() can also be used here instead, if on latest nightly.
-        match record.transaction_type {
-            TransactionType::Deposit | TransactionType::Withdrawal => {
-                if let Err(e) = ledger.append_transaction(&record) {
-                    error!("Failed to append transaction to ledger, skipping: {}", e);
-                    continue;
-                }
-            }
-            _ => {}
-        }
         let client_id = record.client_id;
         // Create a client account task channel, this also ensures client accounts are unique (side effect)
         let sender = senders.entry(client_id).or_insert_with(|| {

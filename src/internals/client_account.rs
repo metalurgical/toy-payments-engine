@@ -1,6 +1,6 @@
 use crate::errors::ApplicationError;
 use crate::internals::{
-    Operation, Transaction, ledger::Ledger, shared::serialize_u128_fixed,
+    Operation, Transaction, TransactionRecord, ledger::Ledger, shared::serialize_u128_fixed,
     transaction_type::TransactionType,
 };
 use serde::{Serialize, Serializer};
@@ -75,6 +75,12 @@ impl ClientAccount {
         {
             return Err(TxError("Already processed deposit".to_string()));
         }
+        self.ledger.append_transaction(&TransactionRecord {
+            transaction_type: tx.transaction_type,
+            client_id: tx.client_id,
+            transaction_id: Some(tx.transaction_id),
+            amount: Some(tx.amount),
+        })?;
         // TODO: Probably should check deposit exists in ledger for a real app
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
@@ -106,6 +112,12 @@ impl ClientAccount {
         {
             return Err(TxError("Already processed withdrawal".to_string()));
         }
+        self.ledger.append_transaction(&TransactionRecord {
+            transaction_type: tx.transaction_type,
+            client_id: tx.client_id,
+            transaction_id: Some(tx.transaction_id),
+            amount: Some(tx.amount),
+        })?;
         if self.available < tx.amount {
             return Err(TxError("Insufficient available funds".to_string()));
         }
