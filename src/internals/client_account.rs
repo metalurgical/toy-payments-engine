@@ -111,15 +111,15 @@ impl ClientAccount {
         {
             return Err(TxError("Already processed withdrawal".to_string()));
         }
+        if self.available < tx.amount {
+            return Err(TxError("Insufficient available funds".to_string()));
+        }
         self.ledger.append_transaction(&TransactionRecord {
             transaction_type: tx.transaction_type,
             client_id: tx.client_id,
             transaction_id: Some(tx.transaction_id),
             amount: Some(tx.amount),
         })?;
-        if self.available < tx.amount {
-            return Err(TxError("Insufficient available funds".to_string()));
-        }
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available -= tx.amount;
