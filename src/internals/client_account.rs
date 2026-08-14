@@ -134,7 +134,7 @@ impl ClientAccount {
     /// - Tx has already been disputed before (can only be disputed once)
     /// - Tx has already been resolved/chargeback before
     /// - Account does not have enough available funds to be held for dispute
-    /// - Deposit cannot be retrieved from storage for [`crate::internals::transaction_record::TransactionRecord`] referenced by operation
+    /// - Deposit cannot be retrieved from storage for [`TransactionRecord`] referenced by operation
     pub fn dispute(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Dispute {
             return Err(TxError("Not a dispute".to_string()));
@@ -198,7 +198,7 @@ impl ClientAccount {
     /// - Tx has already been resolved/chargeback before
     /// - Tx is not disputed previously
     /// - Account does not have enough held funds to be returned
-    /// - Original deposit cannot be retrieved from storage for [`crate::internals::transaction_record::TransactionRecord`] referenced by operation
+    /// - Original deposit cannot be retrieved from storage for [`TransactionRecord`] referenced by operation
     pub fn resolve(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Resolve {
             return Err(TxError("Not a resolution".to_string()));
@@ -260,7 +260,7 @@ impl ClientAccount {
     /// - Tx has already been resolved/chargeback before
     /// - Tx is not disputed previously
     /// - Account does not have enough held funds to be returned
-    /// - Original deposit cannot be retrieved from storage for [`crate::internals::transaction_record::TransactionRecord`] referenced by operation
+    /// - Original deposit cannot be retrieved from storage for [`TransactionRecord`] referenced by operation
     pub fn chargeback(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Chargeback {
             return Err(TxError("Not a chargeback".to_string()));
