@@ -10,6 +10,12 @@ pub enum ApplicationError {
     CSVParse(#[from] csv::Error),
     #[error("Ledger processing failed: {0}")]
     LedgerError(String),
+    #[error("Transaction failed: {0}")]
+    TransactionError(String),
+    #[error("Logger initialization failed: {0}")]
+    LoggingInitError(String),
     #[error("Conversion failed: {0}")]
     StructConversionError(String),
+    #[error("Join  error: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
 }

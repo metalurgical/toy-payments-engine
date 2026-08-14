@@ -7,5 +7,5 @@ chargeback, 1, 1
 deposit, 2, 4, 10.0
 dispute, 2, 4
 resolve, 2, 4
-withdrawal, 2, 5, 4.0
+withdrawal, 2, 5, 2.0
 chargeback,NAN,NAN

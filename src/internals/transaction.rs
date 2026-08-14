@@ -1,6 +1,7 @@
-use crate::errors::ApplicationError;
-use crate::errors::ApplicationError::StructConversionError;
-use crate::internals::transaction_type::TransactionType;
+use crate::{
+    errors::{ApplicationError, ApplicationError::StructConversionError},
+    internals::{transaction_record::TransactionRecord, transaction_type::TransactionType},
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Transaction {
@@ -11,9 +12,7 @@ pub struct Transaction {
 }
 
 impl Transaction {
-    pub fn new(
-        tx: crate::internals::transaction_record::TransactionRecord,
-    ) -> Result<Self, ApplicationError> {
+    pub fn new(tx: TransactionRecord) -> Result<Self, ApplicationError> {
         if let Some(id) = tx.transaction_id {
             if let Some(amount) = tx.amount {
                 Ok(Self {

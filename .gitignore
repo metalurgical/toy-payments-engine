@@ -3,3 +3,4 @@
 *.pdb
 **/mutants.out*/
 .idea/
+/errors.log

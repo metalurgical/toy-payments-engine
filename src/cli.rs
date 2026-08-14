@@ -31,7 +31,6 @@ mod tests {
         let cli = parsed.unwrap();
         assert_eq!(cli.file_path, PathBuf::from("test_input/cli_arg.csv"));
     }
-
     #[test]
     fn test_cli_missing_argument() {
         let args: Vec<&str> = vec!["toy-payments-engine"];
@@ -40,7 +39,6 @@ mod tests {
         let error = parsed.unwrap_err();
         assert!(matches!(error.into(), CliParse(_)));
     }
-
     #[test]
     fn test_cli_extra_arguments() {
         let input_args = vec![

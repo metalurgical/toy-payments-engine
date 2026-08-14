@@ -1,49 +1,29 @@
-use crate::internals::operation::Operation;
-use crate::internals::shared::serialize_u128_fixed;
-use crate::internals::transaction::Transaction;
-use crate::internals::transaction_type::TransactionType;
+use crate::errors::ApplicationError;
+use crate::internals::{
+    ledger::Ledger, operation::Operation, shared::serialize_u128_fixed, transaction::Transaction,
+    transaction_type::TransactionType,
+};
 use serde::{Serialize, Serializer};
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
+// Prevent overlap with sled TransactionError
+use ApplicationError::TransactionError as TxError;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone)]
 pub struct ClientAccount {
     client_id: u16,
     available: u128,
     held: u128,
     locked: bool,
-    desposits: HashMap<u32, Transaction>,
-    withdrawals: HashMap<u32, Transaction>,
-    disputed: HashMap<u32, Operation>,
-    resolved: HashMap<u32, Operation>,
-    chargeback: HashMap<u32, Operation>,
-}
-
-impl PartialEq<Self> for ClientAccount {
-    fn eq(&self, other: &Self) -> bool {
-        self.client_id == other.client_id
-    }
-}
-impl Eq for ClientAccount {}
-
-impl Hash for ClientAccount {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        state.write(&self.client_id.to_be_bytes());
-    }
+    ledger: Ledger,
 }
 
 impl ClientAccount {
-    pub fn new(client_id: u16) -> Self {
+    pub fn new(client_id: u16, ledger: Ledger) -> Self {
         Self {
             client_id,
             available: 0,
             held: 0,
             locked: false,
-            desposits: Default::default(),
-            withdrawals: Default::default(),
-            disputed: Default::default(),
-            resolved: Default::default(),
-            chargeback: Default::default(),
+            ledger,
         }
     }
 
@@ -67,124 +47,190 @@ impl ClientAccount {
         self.available + self.held
     }
 
-    pub fn deposit(&mut self, tx: Transaction) -> Result<(), String> {
+    pub fn deposit(&mut self, tx: Transaction) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Deposit {
-            return Err("Not a deposit".to_string());
+            return Err(TxError("Not a deposit".to_string()));
         }
         if tx.client_id != self.client_id() {
-            return Err("Not for this account".to_string());
+            return Err(TxError("Not for this account".to_string()));
         }
-
-        if self.desposits.contains_key(&tx.transaction_id) {
-            return Err("Transaction already deposited".to_string());
+        if self
+            .ledger
+            .is_state(tx.transaction_type, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already deposited".to_string()));
         }
-        self.desposits.insert(tx.transaction_id, tx.clone());
+        self.ledger
+            .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available += tx.amount;
         Ok(())
     }
 
-    pub fn withdraw(&mut self, tx: Transaction) -> Result<(), String> {
+    pub fn withdraw(&mut self, tx: Transaction) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Withdrawal {
-            return Err("Not a withdrawal".to_string());
+            return Err(TxError("Not a withdrawal".to_string()));
         }
         if tx.client_id != self.client_id() {
-            return Err("Not for this account".to_string());
+            return Err(TxError("Not for this account".to_string()));
         }
         if self.locked {
-            return Err("Account locked".to_string());
+            return Err(TxError("Account locked".to_string()));
         }
-
-        if self.withdrawals.contains_key(&tx.transaction_id) {
-            return Err("Already withdrawn".to_string());
+        if self
+            .ledger
+            .is_state(tx.transaction_type, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already withdrawn".to_string()));
         }
         if self.available < tx.amount {
-            return Err("Insufficient funds".to_string());
+            return Err(TxError("Insufficient funds".to_string()));
         }
-        self.withdrawals.insert(tx.transaction_id, tx.clone());
+        if self.locked {
+            return Err(TxError("Account locked".to_string()));
+        }
+        self.ledger
+            .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available -= tx.amount;
         Ok(())
     }
 
-    pub fn dispute(&mut self, tx: Operation) -> Result<(), String> {
+    pub fn dispute(&mut self, tx: Operation) -> Result<(), ApplicationError> {
         if tx.transaction_type != TransactionType::Dispute {
-            return Err("Not a dispute".to_string());
+            return Err(TxError("Not a dispute".to_string()));
         }
         if tx.client_id != self.client_id() {
-            return Err("Not for this account".to_string());
+            return Err(TxError("Not for this account".to_string()));
         }
-        if self.disputed.contains_key(&tx.transaction_id) {
-            return Err("Already disputed".to_string());
+        if self
+            .ledger
+            .is_state(TransactionType::Dispute, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already disputed".to_string()));
         }
-        match self.desposits.get(&tx.transaction_id) {
-            None => Err("No deposit record found to dispute".to_string()),
-            Some(original_deposit) => {
-                let amount = original_deposit.amount;
-                self.available -= amount;
-                self.held += amount;
-                self.disputed.insert(tx.transaction_id, tx.clone());
-                Ok(())
-            }
-        }
-    }
-
-    pub fn resolve(&mut self, tx: Operation) -> Result<(), String> {
-        if tx.transaction_type != TransactionType::Resolve {
-            return Err("Not a resolution".to_string());
-        }
-        if tx.client_id != self.client_id() {
-            return Err("Not for this account".to_string());
-        }
-        if self.resolved.contains_key(&tx.transaction_id) {
-            return Err("Already resolved".to_string());
-        }
-        match self.disputed.get(&tx.transaction_id) {
-            None => Err("No active dispute logged for this transaction".to_string()),
-            Some(_) => {
-                let original_deposit = self
-                    .desposits
-                    .get(&tx.transaction_id)
-                    .ok_or_else(|| "Original deposit missing during resolution".to_string())?;
-                let amount = original_deposit.amount;
-                if self.held < amount {
-                    return Err("Funds unavailable in hold block for resolve".to_string());
-                }
-                self.resolved.insert(tx.transaction_id, tx.clone());
-                self.held -= amount;
-                self.available += amount;
-                Ok(())
-            }
-        }
-    }
-
-    pub fn chargeback(&mut self, tx: Operation) -> Result<(), String> {
-        if tx.transaction_type != TransactionType::Chargeback {
-            return Err("Not a chargeback".to_string());
-        }
-        if tx.client_id != self.client_id() {
-            return Err("Not for this account".to_string());
-        }
-        if self.chargeback.contains_key(&tx.transaction_id) {
-            return Err("Already charged back".to_string());
+        if self
+            .ledger
+            .is_state(TransactionType::Resolve, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already resolved".to_string()));
         }
         if self.locked {
-            return Err("Account locked".to_string());
+            return Err(TxError("Account locked".to_string()));
         }
+        if self
+            .ledger
+            .is_state(TransactionType::Chargeback, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already charged back".to_string()));
+        }
+        let state = self
+            .ledger
+            .get_transaction(tx.client_id, tx.transaction_id)?;
+        match state {
+            None => Err(TxError("Failed to retrieve transaction amount".to_string())),
+            Some(tr) => {
+                self.ledger
+                    .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
+                self.available -= tr.amount.unwrap();
+                self.held += tr.amount.unwrap();
+                Ok(())
+            }
+        }
+    }
 
-        match self.disputed.get(&tx.transaction_id) {
-            None => Err("No active dispute logged for this transaction".to_string()),
-            Some(_) => {
-                let original_deposit = self
-                    .desposits
-                    .get(&tx.transaction_id)
-                    .ok_or_else(|| "Original deposit missing during chargeback".to_string())?;
-                let amount = original_deposit.amount;
-
-                if self.held < amount {
-                    return Err("Funds unavailable in hold block for chargeback".to_string());
+    pub fn resolve(&mut self, tx: Operation) -> Result<(), ApplicationError> {
+        if tx.transaction_type != TransactionType::Resolve {
+            return Err(TxError("Not a resolution".to_string()));
+        }
+        if tx.client_id != self.client_id() {
+            return Err(TxError("Not for this account".to_string()));
+        }
+        if self
+            .ledger
+            .is_state(TransactionType::Resolve, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already resolved".to_string()));
+        }
+        if self
+            .ledger
+            .is_state(TransactionType::Chargeback, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already chargeback".to_string()));
+        }
+        if self.locked {
+            return Err(TxError("Account locked".to_string()));
+        }
+        if !self
+            .ledger
+            .is_state(TransactionType::Dispute, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError(
+                "No active dispute logged for this transaction".to_string(),
+            ));
+        }
+        let state = self
+            .ledger
+            .get_transaction(tx.client_id, tx.transaction_id)?;
+        match state {
+            None => Err(TxError("Failed to retrieve transaction amount".to_string())),
+            Some(tr) => {
+                self.ledger
+                    .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
+                if self.held < tr.amount.unwrap() {
+                    return Err(TxError(
+                        "Funds unavailable in hold block for resolve".to_string(),
+                    ));
                 }
+                self.held -= tr.amount.unwrap();
+                self.available += tr.amount.unwrap();
+                Ok(())
+            }
+        }
+    }
 
-                self.chargeback.insert(tx.transaction_id, tx.clone());
-                self.held -= amount;
+    pub fn chargeback(&mut self, tx: Operation) -> Result<(), ApplicationError> {
+        if tx.transaction_type != TransactionType::Chargeback {
+            return Err(TxError("Not a chargeback".to_string()));
+        }
+        if tx.client_id != self.client_id() {
+            return Err(TxError("Not for this account".to_string()));
+        }
+        if self
+            .ledger
+            .is_state(TransactionType::Resolve, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already resolved".to_string()));
+        }
+        if self
+            .ledger
+            .is_state(TransactionType::Chargeback, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError("Already charged back".to_string()));
+        }
+        if self.locked {
+            return Err(TxError("Account locked".to_string()));
+        }
+        if !self
+            .ledger
+            .is_state(TransactionType::Dispute, tx.client_id, tx.transaction_id)?
+        {
+            return Err(TxError(
+                "No active dispute logged for this transaction".to_string(),
+            ));
+        }
+        let state = self
+            .ledger
+            .get_transaction(tx.client_id, tx.transaction_id)?;
+        match state {
+            None => Err(TxError("Failed to retrieve transaction amount".to_string())),
+            Some(tr) => {
+                self.ledger
+                    .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
+                if self.held < tr.amount.unwrap() {
+                    return Err(TxError(
+                        "Funds unavailable in hold block for chargeback".to_string(),
+                    ));
+                }
+                self.held -= tr.amount.unwrap();
                 self.lock();
                 Ok(())
             }
@@ -193,6 +239,11 @@ impl ClientAccount {
 
     fn lock(&mut self) {
         self.locked = true;
+    }
+
+    #[allow(dead_code)]
+    fn unlock(&mut self) {
+        self.locked = false;
     }
 }
 
@@ -213,7 +264,6 @@ impl Serialize for ClientAccount {
             total: u128,
             locked: bool,
         }
-
         let shadow = Layout {
             client_id: self.client_id(),
             available: self.available(),
@@ -221,7 +271,6 @@ impl Serialize for ClientAccount {
             total: self.total(),
             locked: self.locked(),
         };
-
         shadow.serialize(serializer)
     }
 }

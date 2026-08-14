@@ -1,7 +1,7 @@
-use crate::errors::ApplicationError;
-use crate::errors::ApplicationError::StructConversionError;
-use crate::internals::transaction_record::TransactionRecord;
-use crate::internals::transaction_type::TransactionType;
+use crate::{
+    errors::{ApplicationError, ApplicationError::StructConversionError},
+    internals::{transaction_record::TransactionRecord, transaction_type::TransactionType},
+};
 
 #[derive(Debug, Default, Clone)]
 pub struct Operation {
