@@ -53,6 +53,15 @@ impl ClientAccount {
         self.available + self.held
     }
 
+    fn append_transaction(&self, tx: &Transaction) -> Result<(), ApplicationError> {
+        self.ledger.append_transaction(&TransactionRecord {
+            transaction_type: tx.transaction_type,
+            client_id: tx.client_id,
+            transaction_id: Some(tx.transaction_id),
+            amount: Some(tx.amount),
+        })
+    }
+
     /// Deposits funds into the account, increasing the available balance and marking the transaction
     /// as being processed in the ledger no error condition occur.
     /// It returns a [`ApplicationError::TransactionError`] in the following cases:
@@ -75,12 +84,7 @@ impl ClientAccount {
         {
             return Err(TxError("Already processed deposit".to_string()));
         }
-        self.ledger.append_transaction(&TransactionRecord {
-            transaction_type: tx.transaction_type,
-            client_id: tx.client_id,
-            transaction_id: Some(tx.transaction_id),
-            amount: Some(tx.amount),
-        })?;
+        self.append_transaction(&tx)?;
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available += tx.amount;
@@ -114,12 +118,7 @@ impl ClientAccount {
         if self.available < tx.amount {
             return Err(TxError("Insufficient available funds".to_string()));
         }
-        self.ledger.append_transaction(&TransactionRecord {
-            transaction_type: tx.transaction_type,
-            client_id: tx.client_id,
-            transaction_id: Some(tx.transaction_id),
-            amount: Some(tx.amount),
-        })?;
+        self.append_transaction(&tx)?;
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available -= tx.amount;
