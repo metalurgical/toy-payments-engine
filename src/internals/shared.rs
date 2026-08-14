@@ -66,7 +66,11 @@ fn format_u128_fixed(val: u128) -> String {
     let integer_part = val / PRECISION_SCALE;
     let fractional_part = val % PRECISION_SCALE;
     if fractional_part > 0 {
-        format!("{}.{}", integer_part, format!("{:04}", fractional_part).trim_end_matches('0'))
+        format!(
+            "{}.{}",
+            integer_part,
+            format!("{:04}", fractional_part).trim_end_matches('0')
+        )
     } else {
         format!("{}", integer_part)
     }

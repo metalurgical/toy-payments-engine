@@ -128,10 +128,13 @@ impl ClientAccount {
         match state {
             None => Err(TxError("Failed to retrieve transaction amount".to_string())),
             Some(tr) => {
+                let amount = tr.amount.ok_or_else(|| {
+                    TxError("Amount not returned with TransactionRecord".to_string())
+                })?;
                 self.ledger
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-                self.available -= tr.amount.unwrap();
-                self.held += tr.amount.unwrap();
+                self.available -= amount;
+                self.held += amount;
                 Ok(())
             }
         }
@@ -173,15 +176,18 @@ impl ClientAccount {
         match state {
             None => Err(TxError("Failed to retrieve transaction amount".to_string())),
             Some(tr) => {
+                let amount = tr.amount.ok_or_else(|| {
+                    TxError("Amount not returned with TransactionRecord".to_string())
+                })?;
                 self.ledger
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-                if self.held < tr.amount.unwrap() {
+                if self.held < amount {
                     return Err(TxError(
                         "Funds unavailable in hold block for resolve".to_string(),
                     ));
                 }
-                self.held -= tr.amount.unwrap();
-                self.available += tr.amount.unwrap();
+                self.held -= amount;
+                self.available += amount;
                 Ok(())
             }
         }
@@ -223,14 +229,17 @@ impl ClientAccount {
         match state {
             None => Err(TxError("Failed to retrieve transaction amount".to_string())),
             Some(tr) => {
+                let amount = tr.amount.ok_or_else(|| {
+                    TxError("Amount not returned with TransactionRecord".to_string())
+                })?;
                 self.ledger
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-                if self.held < tr.amount.unwrap() {
+                if self.held < amount {
                     return Err(TxError(
                         "Funds unavailable in hold block for chargeback".to_string(),
                     ));
                 }
-                self.held -= tr.amount.unwrap();
+                self.held -= amount;
                 self.lock();
                 Ok(())
             }
