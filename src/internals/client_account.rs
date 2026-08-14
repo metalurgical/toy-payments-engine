@@ -81,7 +81,6 @@ impl ClientAccount {
             transaction_id: Some(tx.transaction_id),
             amount: Some(tx.amount),
         })?;
-        // TODO: Probably should check deposit exists in ledger for a real app
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available += tx.amount;
@@ -121,7 +120,6 @@ impl ClientAccount {
         if self.available < tx.amount {
             return Err(TxError("Insufficient available funds".to_string()));
         }
-        // TODO: Probably should check withdrawal exists in ledger for a real app
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
         self.available -= tx.amount;
