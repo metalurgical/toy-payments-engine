@@ -42,10 +42,10 @@ pub async fn run_engine(
         let sender = senders.entry(client_id).or_insert_with(|| {
             let (tx, mut rx) = mpsc::channel::<TransactionRecord>(PER_CLIENT_CHANNEL_CAPACITY);
             let ledger = ledger.clone();
-            client_tasks.spawn(async move {
+            client_tasks.spawn_blocking(move || {
                 let mut client = ClientAccount::new(client_id, ledger);
                 // Perform operation on client account received from client tasks channel
-                while let Some(record) = rx.recv().await {
+                while let Some(record) = rx.blocking_recv() {
                     apply_record(&mut client, record);
                 }
                 client
