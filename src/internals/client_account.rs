@@ -442,7 +442,6 @@ mod tests {
     fn dispute_moves_available_to_held() {
         let ledger = Ledger::new().unwrap();
         let record = record(TransactionType::Deposit, 1, 1, 1);
-        ledger.append_transaction(&record).unwrap();
         let mut client = ClientAccount::new(1, ledger);
         client.deposit(Transaction::new(record).unwrap()).unwrap();
         client.dispute(op(TransactionType::Dispute, 1, 1)).unwrap();
@@ -454,7 +453,6 @@ mod tests {
     fn resolve_moves_held_back_to_available() {
         let ledger = Ledger::new().unwrap();
         let record = record(TransactionType::Deposit, 1, 1, 1);
-        ledger.append_transaction(&record).unwrap();
         let mut client = ClientAccount::new(1, ledger);
         client.deposit(Transaction::new(record).unwrap()).unwrap();
         client.dispute(op(TransactionType::Dispute, 1, 1)).unwrap();
@@ -468,7 +466,6 @@ mod tests {
     fn chargeback_locks_the_account_and_reduces_held_funds() {
         let ledger = Ledger::new().unwrap();
         let record = record(TransactionType::Deposit, 1, 1, 1);
-        ledger.append_transaction(&record).unwrap();
         let mut client = ClientAccount::new(1, ledger);
         client.deposit(Transaction::new(record).unwrap()).unwrap();
         client.dispute(op(TransactionType::Dispute, 1, 1)).unwrap();
@@ -700,7 +697,6 @@ mod tests {
             }
             TransactionType::Dispute => {
                 let tx = record(TransactionType::Deposit, 1, 1, 0);
-                client.ledger.append_transaction(&tx).unwrap();
                 client.deposit(Transaction::new(tx).unwrap()).unwrap();
                 let tx_record = op(TransactionType::Dispute, 1, 1);
                 client.dispute(tx_record.clone()).unwrap();
@@ -715,7 +711,6 @@ mod tests {
             }
             TransactionType::Resolve => {
                 let tx = record(TransactionType::Deposit, 1, 1, 0);
-                client.ledger.append_transaction(&tx).unwrap();
                 client.deposit(Transaction::new(tx).unwrap()).unwrap();
                 let mut tx_record = op(TransactionType::Dispute, 1, 1);
                 client.dispute(tx_record.clone()).unwrap();
@@ -732,7 +727,6 @@ mod tests {
             }
             TransactionType::Chargeback => {
                 let tx = record(TransactionType::Deposit, 1, 1, 0);
-                client.ledger.append_transaction(&tx).unwrap();
                 client.deposit(Transaction::new(tx).unwrap()).unwrap();
                 let mut tx_record = op(TransactionType::Dispute, 1, 1);
                 client.dispute(tx_record.clone()).unwrap();
@@ -759,7 +753,6 @@ mod tests {
         match input {
             TransactionType::Resolve => {
                 let tx = record(TransactionType::Deposit, 1, 1, 0);
-                client.ledger.append_transaction(&tx).unwrap();
                 client.deposit(Transaction::new(tx).unwrap()).unwrap();
                 let tx_record = op(TransactionType::Resolve, 1, 1);
                 assert!(
@@ -772,7 +765,6 @@ mod tests {
             }
             TransactionType::Chargeback => {
                 let tx = record(TransactionType::Deposit, 1, 1, 0);
-                client.ledger.append_transaction(&tx).unwrap();
                 client.deposit(Transaction::new(tx).unwrap()).unwrap();
                 let tx_record = op(TransactionType::Chargeback, 1, 1);
                 assert!(
@@ -787,5 +779,36 @@ mod tests {
                 unreachable!()
             }
         }
+    }
+
+    #[test]
+    fn withdrawal_reusing_deposit_tx_id_is_rejected_and_deposit_stays_disputable() {
+        use crate::internals::{Operation, Transaction, TransactionType};
+        let mut account = ClientAccount::new(1, Ledger::new().unwrap());
+        account
+            .deposit(Transaction {
+                transaction_type: TransactionType::Deposit,
+                client_id: 1,
+                transaction_id: 1,
+                amount: 100_000,
+            })
+            .unwrap();
+        let withdrawal = Transaction {
+            transaction_type: TransactionType::Withdrawal,
+            client_id: 1,
+            transaction_id: 1,
+            amount: 20_000,
+        };
+        assert!(account.withdraw(withdrawal).is_err());
+        assert_eq!(account.available(), 100_000);
+        account
+            .dispute(Operation {
+                transaction_type: TransactionType::Dispute,
+                client_id: 1,
+                transaction_id: 1,
+            })
+            .unwrap();
+        assert_eq!(account.held(), 100_000);
+        assert_eq!(account.available(), 0);
     }
 }

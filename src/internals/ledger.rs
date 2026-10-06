@@ -102,8 +102,13 @@ impl Ledger {
         let value = postcard::to_allocvec(record)
             .map_err(|e| ApplicationError::LedgerError(e.to_string()))?;
         self.db
-            .insert(key, value)
-            .map_err(|e| ApplicationError::LedgerError(e.to_string()))?;
+            .compare_and_swap(key, None::<&[u8]>, Some(value))
+            .map_err(|e| ApplicationError::LedgerError(e.to_string()))?
+            .map_err(|_| {
+                ApplicationError::TransactionError(
+                    "Transaction id already used for this client".to_string(),
+                )
+            })?;
         Ok(())
     }
 
@@ -154,6 +159,18 @@ mod tests {
         assert_eq!(fetched.client_id, 1);
         assert_eq!(fetched.transaction_id, Some(42));
         assert_eq!(fetched.amount, Some(12_345));
+    }
+
+    #[test]
+    fn append_transaction_does_not_overwrite_existing_record() {
+        let ledger = Ledger::new().unwrap();
+        ledger.append_transaction(&record(1, 7, 100)).unwrap();
+        let mut other = record(1, 7, 5);
+        other.transaction_type = TransactionType::Withdrawal;
+        assert!(ledger.append_transaction(&other).is_err());
+        let kept = ledger.get_transaction(1, 7).unwrap().unwrap();
+        assert_eq!(kept.transaction_type, TransactionType::Deposit);
+        assert_eq!(kept.amount, Some(100));
     }
 
     #[test]
