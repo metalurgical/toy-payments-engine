@@ -68,6 +68,7 @@ impl ClientAccount {
     /// - Tx is not a Deposit
     /// - Tx has a client_id different to this account
     /// - Tx has already been processed
+    /// - Deposit would overflow the account balance
     ///
     /// If the account is locked, it can still receive deposits and this is not an
     /// error case.
@@ -84,10 +85,15 @@ impl ClientAccount {
         {
             return Err(TxError("Already processed deposit".to_string()));
         }
+        let new_available = self
+            .total()
+            .checked_add(tx.amount)
+            .and_then(|_| self.available.checked_add(tx.amount))
+            .ok_or_else(|| TxError("Deposit would overflow account balance".to_string()))?;
         self.append_transaction(&tx)?;
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-        self.available += tx.amount;
+        self.available = new_available;
         Ok(())
     }
 
@@ -115,13 +121,14 @@ impl ClientAccount {
         {
             return Err(TxError("Already processed withdrawal".to_string()));
         }
-        if self.available < tx.amount {
-            return Err(TxError("Insufficient available funds".to_string()));
-        }
+        let new_available = self
+            .available
+            .checked_sub(tx.amount)
+            .ok_or_else(|| TxError("Insufficient available funds".to_string()))?;
         self.append_transaction(&tx)?;
         self.ledger
             .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-        self.available -= tx.amount;
+        self.available = new_available;
         Ok(())
     }
 
@@ -177,13 +184,18 @@ impl ClientAccount {
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
-                if self.available < amount {
-                    return Err(TxError("Insufficient available funds".to_string()));
-                }
+                let new_available = self
+                    .available
+                    .checked_sub(amount)
+                    .ok_or_else(|| TxError("Insufficient available funds".to_string()))?;
+                let new_held = self
+                    .held
+                    .checked_add(amount)
+                    .ok_or_else(|| TxError("Held funds would overflow".to_string()))?;
                 self.ledger
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-                self.available -= amount;
-                self.held += amount;
+                self.available = new_available;
+                self.held = new_held;
                 Ok(())
             }
         }
@@ -239,13 +251,18 @@ impl ClientAccount {
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
-                if self.held < amount {
-                    return Err(TxError("Insufficient held funds".to_string()));
-                }
+                let new_held = self
+                    .held
+                    .checked_sub(amount)
+                    .ok_or_else(|| TxError("Insufficient held funds".to_string()))?;
+                let new_available = self
+                    .available
+                    .checked_add(amount)
+                    .ok_or_else(|| TxError("Available funds would overflow".to_string()))?;
                 self.ledger
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-                self.held -= amount;
-                self.available += amount;
+                self.held = new_held;
+                self.available = new_available;
                 Ok(())
             }
         }
@@ -301,14 +318,12 @@ impl ClientAccount {
                 let amount = tr.amount.ok_or_else(|| {
                     TxError("Amount not returned with TransactionRecord".to_string())
                 })?;
-                if self.held < amount {
-                    return Err(TxError(
-                        "Funds unavailable in hold block for chargeback".to_string(),
-                    ));
-                }
+                let new_held = self.held.checked_sub(amount).ok_or_else(|| {
+                    TxError("Funds unavailable in hold block for chargeback".to_string())
+                })?;
                 self.ledger
                     .mark_state(tx.transaction_type, tx.client_id, tx.transaction_id)?;
-                self.held -= amount;
+                self.held = new_held;
                 self.lock();
                 // TODO: This probably should be stored as a TransactionRecord in Ledger as well, especially to produce an audit trail later
                 Ok(())
@@ -810,5 +825,21 @@ mod tests {
             .unwrap();
         assert_eq!(account.held(), 100_000);
         assert_eq!(account.available(), 0);
+    }
+
+    #[test]
+    fn deposit_that_would_overflow_is_rejected_without_changing_balance() {
+        use crate::internals::{Transaction, TransactionType};
+        let mut account = ClientAccount::new(1, Ledger::new().unwrap());
+        let deposit = |id: u32, amount: u128| Transaction {
+            transaction_type: TransactionType::Deposit,
+            client_id: 1,
+            transaction_id: id,
+            amount,
+        };
+        account.deposit(deposit(1, u128::MAX)).unwrap();
+        assert!(account.deposit(deposit(2, 1)).is_err());
+        assert_eq!(account.available(), u128::MAX);
+        assert_eq!(account.total(), u128::MAX);
     }
 }
