@@ -26,6 +26,8 @@ jobs:
 
     - name: Install tombi
       uses: tombi-toml/setup-tombi@v1
+      with:
+        version: "0.10.0"
 
     - name: Rustfmt
       run: cargo +nightly fmt --all --check
