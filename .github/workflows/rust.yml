@@ -10,13 +10,34 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  check:
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v4
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
+
+    - name: Install toolchains
+      run: |
+        rustup toolchain install stable --component clippy --profile minimal
+        rustup toolchain install nightly --component rustfmt --profile minimal
+        rustup default stable
+
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Install tombi
+      uses: tombi-toml/setup-tombi@v1
+
+    - name: Rustfmt
+      run: cargo +nightly fmt --all --check
+
+    - name: Tombi format
+      run: tombi format --check
+
+    - name: Clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Rustdoc check
+      run: cargo +nightly rustdoc -- -Z unstable-options --check
+
+    - name: Test
       run: cargo test --verbose
